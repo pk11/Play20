@@ -93,6 +93,8 @@ trait PlaySettings {
 
     distDirectory <<= baseDirectory / "dist",
 
+    distExcludes := Seq.empty,
+
     libraryDependencies <+= (playPlugin) { isPlugin =>
       val d = "play" %% "play" % play.core.PlayVersion.current
       if(isPlugin)
@@ -199,7 +201,7 @@ trait PlaySettings {
     coffeescriptOptions := Seq.empty[String],
     closureCompilerOptions := Seq.empty[String],
 
-    incrementalAssetsCompilation := false,
+    incrementalAssetsCompilation := true,
 
     // Templates
 
