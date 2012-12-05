@@ -7,5 +7,8 @@ private[play] object Execution {
      val numberOfThreads = play.api.Play.maybeApplication.map(_.configuration.getInt("internal-threadpool-size")).flatten.getOrElse(Runtime.getRuntime.availableProcessors)
      scala.concurrent.ExecutionContext.fromExecutorService(java.util.concurrent.Executors.newFixedThreadPool(numberOfThreads))
   }
+   object Implicits {
+   	  implicit val internalContext = Execution.internalContext
+   }
   
 }

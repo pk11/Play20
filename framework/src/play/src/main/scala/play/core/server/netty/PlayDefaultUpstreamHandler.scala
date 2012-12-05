@@ -30,7 +30,7 @@ import scala.util.control.NonFatal
 
 private[server] class PlayDefaultUpstreamHandler(server: Server, allChannels: DefaultChannelGroup) extends SimpleChannelUpstreamHandler with Helpers with WebSocketHandler with RequestBodyHandler {
 
-  implicit val internalExecutionContext =  play.core.Execution.internalContext
+  import play.core.Execution.Implicits._
 
   private val requestIDs = new java.util.concurrent.atomic.AtomicLong(0)
 
@@ -171,7 +171,7 @@ private[server] class PlayDefaultUpstreamHandler(server: Server, allChannels: De
                   val channelBuffer = ChannelBuffers.dynamicBuffer(512)
                   val writer: Function2[ChannelBuffer, r.BODY_CONTENT, Unit] = (c, x) => c.writeBytes(r.writeable.transform(x))
                   val stringIteratee = Iteratee.fold(channelBuffer)((c, e: r.BODY_CONTENT) => { writer(c, e); c })
-                  val p = (body |>>> Enumeratee.grouped(stringIteratee) &>> Cont { 
+                  val p = (body |>>> Enumeratee.grouped(internalContext)(stringIteratee) &>> Cont { 
                     case Input.El(buffer) =>
                       nettyResponse.setHeader(CONTENT_LENGTH, channelBuffer.readableBytes)
                       nettyResponse.setContent(buffer)

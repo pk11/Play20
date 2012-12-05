@@ -50,10 +50,10 @@ object Comet {
    */
   def apply[E](callback: String, initialChunk: Html = Html(Array.fill[Char](5 * 1024)(' ').mkString + "<html><body>"))(implicit encoder: CometMessage[E]) = new Enumeratee[E, Html] {
 
-    def applyOn[A](inner: Iteratee[Html, A]): Iteratee[E, Iteratee[Html, A]] = {
+    def applyOn[A](inner: Iteratee[Html, A])(implicit ec: scala.concurrent.ExecutionContext): Iteratee[E, Iteratee[Html, A]] = {
 
       val fedWithInitialChunk = Iteratee.flatten(Enumerator(initialChunk) |>> inner)
-      val eToScript = Enumeratee.map[E](data => Html("""<script type="text/javascript">""" + callback + """(""" + encoder.toJavascriptMessage(data) + """);</script>"""))
+      val eToScript:Enumeratee = Enumeratee.map[E](data => Html("""<script type="text/javascript">""" + callback + """(""" + encoder.toJavascriptMessage(data) + """);</script>"""))
       eToScript.applyOn(fedWithInitialChunk)
     }
   }

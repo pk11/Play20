@@ -14,7 +14,7 @@ import org.joda.time.format.{ DateTimeFormatter, DateTimeFormat }
 import org.joda.time.DateTimeZone
 import collection.JavaConverters._
 import scala.util.control.NonFatal
-
+import play.api.libs.concurrent.Execution.Implicits._
 /**
  * Controller that serves static resources.
  *

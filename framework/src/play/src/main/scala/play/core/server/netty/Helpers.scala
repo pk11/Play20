@@ -15,6 +15,7 @@ private[netty] trait Helpers {
 
   def socketOut[A](ctx: ChannelHandlerContext)(frameFormatter: play.api.mvc.WebSocket.FrameFormatter[A]): Iteratee[A, Unit] = {
     val channel = ctx.getChannel()
+    import play.core.Execution.Implicits._
     val nettyFrameFormatter = frameFormatter.asInstanceOf[play.core.server.websocket.FrameFormatter[A]]
 
     def step(future: Option[ChannelFuture])(input: Input[A]): Iteratee[A, Unit] =

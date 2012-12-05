@@ -5,8 +5,7 @@ import scala.concurrent.Promise
 import scala.util.{Try, Failure, Success}
 import Enumerator.Pushee
 import java.util.concurrent.{ TimeUnit }
-
-import play.api.libs.iteratee.internal.defaultExecutionContext
+import scala.concurrent.ExecutionContext
 
 /**
  * Utilities for concurrent usage of iteratees, enumerators and enumeratees.
@@ -86,13 +85,13 @@ object Concurrent {
    * chatChannel.push(Message("Hello world!"))
    * }}}
    */
-  def broadcast[E]: (Enumerator[E], Channel[E]) = {
+  def broadcast[E](implicit ec: ExecutionContext): (Enumerator[E], Channel[E]) = {
 
     import scala.concurrent.stm._
 
     val iteratees: Ref[List[(Iteratee[E, _], Promise[Iteratee[E, _]])]] = Ref(List())
 
-    def step(in: Input[E]): Iteratee[E, Unit] = {
+    def step(in: Input[E])(implicit ec: ExecutionContext): Iteratee[E, Unit] = {
       val interested = iteratees.single.swap(List())
 
       val ready = interested.map {
@@ -161,7 +160,7 @@ object Concurrent {
 
     val toPush = new Channel[E] {
 
-      def push(chunk: Input[E]) {
+      def push(chunk: Input[E]): Unit = {
 
         val itPromise = Promise[Iteratee[E, Unit]]()
 
@@ -221,9 +220,9 @@ object Concurrent {
    * @param timeout The timeout period
    * @param unit the time unit
    */
-  def lazyAndErrIfNotReady[E](timeout: Long, unit: TimeUnit = TimeUnit.MILLISECONDS): Enumeratee[E, E] = new Enumeratee[E, E] {
+  def lazyAndErrIfNotReady[E](timeout: Long, unit: TimeUnit = TimeUnit.MILLISECONDS)(implicit ec: ExecutionContext): Enumeratee[E, E] = new Enumeratee[E, E] {
 
-    def applyOn[A](inner: Iteratee[E, A]): Iteratee[E, Iteratee[E, A]] = {
+    def applyOn[A](inner: Iteratee[E, A])(implicit ec: ExecutionContext): Iteratee[E, Iteratee[E, A]] = {
       def step(it: Iteratee[E, A]): K[E, Iteratee[E, A]] = {
         case Input.EOF => Done(it, Input.EOF)
 
@@ -273,7 +272,7 @@ object Concurrent {
     import scala.concurrent.stm._
     import play.api.libs.iteratee.Enumeratee.CheckDone
 
-    def applyOn[A](it: Iteratee[E, A]): Iteratee[E, Iteratee[E, A]] = {
+    def applyOn[A](it: Iteratee[E, A])(implicit ec: ExecutionContext): Iteratee[E, Iteratee[E, A]] = {
 
       val last = Promise[Iteratee[E, Iteratee[E, A]]]()
 
@@ -364,10 +363,10 @@ object Concurrent {
    * @param duration The time to wait for the iteratee to be ready
    * @param unit The timeunit
    */
-  def dropInputIfNotReady[E](duration: Long, unit: java.util.concurrent.TimeUnit = java.util.concurrent.TimeUnit.MILLISECONDS): Enumeratee[E, E] = new Enumeratee[E, E] {
+  def dropInputIfNotReady[E](duration: Long, unit: java.util.concurrent.TimeUnit = java.util.concurrent.TimeUnit.MILLISECONDS)(implicit ec: ExecutionContext): Enumeratee[E, E] = new Enumeratee[E, E] {
 
     val busy = scala.concurrent.stm.Ref(false)
-    def applyOn[A](it: Iteratee[E, A]): Iteratee[E, Iteratee[E, A]] = {
+    def applyOn[A](it: Iteratee[E, A])(implicit ec: ExecutionContext): Iteratee[E, Iteratee[E, A]] = {
 
       def step(inner: Iteratee[E, A])(in: Input[E]): Iteratee[E, Iteratee[E, A]] = {
 
@@ -418,7 +417,7 @@ object Concurrent {
   def unicast[E](
     onStart: Channel[E] => Unit,
     onComplete: => Unit = (),
-    onError: (String, Input[E]) => Unit = (_: String, _: Input[E]) => ()) = new Enumerator[E] {
+    onError: (String, Input[E]) => Unit = (_: String, _: Input[E]) => ())(implicit ec: ExecutionContext) = new Enumerator[E] {
 
     import scala.concurrent.stm.Ref
 
@@ -427,7 +426,7 @@ object Concurrent {
       val iteratee: Ref[Future[Option[Input[E] => Iteratee[E, A]]]] = Ref(it.pureFold { case  Step.Cont(k) => Some(k); case other => promise.success(other.it); None})
 
       val pushee = new Channel[E] {
-        def close() {
+        def close()(implicit ec: ExecutionContext): Unit =  {
           iteratee.single.swap(Future.successful(None)).onComplete{
             case Success(maybeK) => maybeK.foreach { k => 
               promise.success(k(Input.EOF))
@@ -494,7 +493,7 @@ object Concurrent {
    * @return A tuple of the broadcasting enumerator, that can be applied to each iteratee that wants to receive the
    *         input, and the broadcaster.
    */
-  def broadcast[E](e: Enumerator[E], interestIsDownToZero: Broadcaster => Unit = _ => ()): (Enumerator[E], Broadcaster) = { lazy val h: Hub[E] = hub(e, () => interestIsDownToZero(h)); (h.getPatchCord(), h) }
+  def broadcast[E](e: Enumerator[E], interestIsDownToZero: Broadcaster => Unit = _ => ())(implicit ec: ExecutionContext): (Enumerator[E], Broadcaster) = { lazy val h: Hub[E] = hub(e, () => interestIsDownToZero(h)); (h.getPatchCord(), h) }
 
   /**
    * A broadcaster.  Used to control a broadcasting enumerator.
@@ -520,7 +519,7 @@ object Concurrent {
   @scala.deprecated("use Concurrent.broadcast instead", "2.1.0")
   trait Hub[E] extends Broadcaster {
 
-    def getPatchCord(): Enumerator[E]
+    def getPatchCord()(implicit ec: ExecutionContext): Enumerator[E]
 
   }
 
@@ -535,7 +534,7 @@ object Concurrent {
 
     var closeFlag = false
 
-    def step(in: Input[E]): Iteratee[E, Unit] = {
+    def step(in: Input[E])(implicit ec: ExecutionContext): Iteratee[E, Unit] = {
       val interested: List[(Iteratee[E, _], Promise[Iteratee[E, _]])] = iteratees.single.swap(List())
 
       val commitReady: Ref[List[(Int, (Iteratee[E, _], Promise[Iteratee[E, _]]))]] = Ref(List())
@@ -600,7 +599,7 @@ object Concurrent {
       def closed() = closeFlag
 
       val redeemed = Ref(None: Option[Try[Iteratee[E, Unit]]])
-      def getPatchCord() = new Enumerator[E] {
+      def getPatchCord()(implicit ec: ExecutionContext) = new Enumerator[E] {
 
         def apply[A](it: Iteratee[E, A]): Future[Iteratee[E, A]] = {
           val result = Promise[Iteratee[E, A]]()
@@ -668,7 +667,7 @@ object Concurrent {
    *
    * @param patcher A function that passes a patch panel whenever the enumerator is applied to an iteratee.
    */
-  def patchPanel[E](patcher: PatchPanel[E] => Unit): Enumerator[E] = new Enumerator[E] {
+  def patchPanel[E](patcher: PatchPanel[E] => Unit)(implicit ec: ExecutionContext): Enumerator[E] = new Enumerator[E] {
 
     import scala.concurrent.stm._
 

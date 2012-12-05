@@ -27,6 +27,8 @@ import scala.concurrent.stm._
 
 private[server] trait WebSocketHandler {
   def newWebSocketInHandler[A](frameFormatter: play.api.mvc.WebSocket.FrameFormatter[A]) = {
+    
+    import play.core.Execution.Implicits._
 
     val nettyFrameFormatter = frameFormatter.asInstanceOf[play.core.server.websocket.FrameFormatter[A]]
 

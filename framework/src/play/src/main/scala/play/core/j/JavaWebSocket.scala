@@ -14,7 +14,8 @@ object JavaWebSocket extends JavaHelpers {
     (in, out) =>
 
       import play.api.libs.iteratee._
-
+      import play.core.Execution.Implicits._
+      
       val javaWebSocket = try {
         JContext.current.set(createJavaContext(request))
         retrieveWebSocket

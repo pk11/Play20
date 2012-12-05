@@ -249,12 +249,12 @@ case class RawBuffer(memoryThreshold: Int, initialData: Array[Byte] = Array.empt
  * Default body parsers.
  */
 trait BodyParsers {
-
+  import play.core.Execution.Implicits._
   /**
    * Default body parsers.
    */
   object parse {
-
+    
     /**
      * Unlimited size.
      */
@@ -666,7 +666,7 @@ trait BodyParsers {
           } yield ((partName, fileName, contentType))
         }
       }
-
+      
       def handleFilePart[A](handler: FileInfo => Iteratee[Array[Byte], A]): PartHandler[FilePart[A]] = {
         case FileInfoMatcher(partName, fileName, contentType) =>
           val safeFileName = fileName.split('\\').takeRight(1).mkString
@@ -694,8 +694,9 @@ trait BodyParsers {
           } yield (partName)
         }
       }
-
+      
       def handleDataPart: PartHandler[Part] = {
+
         case headers @ PartInfoMatcher(partName) if !FileInfoMatcher.unapply(headers).isDefined =>
           Traversable.takeUpTo[Array[Byte]](DEFAULT_MAX_TEXT_LENGTH)
             .transform(Iteratee.consume[Array[Byte]]().map(bytes => DataPart(partName, new String(bytes, "utf-8"))))

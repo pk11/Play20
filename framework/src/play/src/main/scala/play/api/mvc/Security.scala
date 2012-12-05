@@ -4,7 +4,7 @@ import play.api._
 import play.api.mvc.Results._
 
 import play.api.libs.iteratee._
-
+import play.core.Execution.internalContext
 /**
  * Helpers to create secure actions.
  */
@@ -45,7 +45,7 @@ object Security {
         val innerAction = action(user)
         innerAction.parser(request).mapDone { body =>
           body.right.map(innerBody => (innerAction, innerBody))
-        }
+        }(internalContext)
       }.getOrElse {
         Done(Left(onUnauthorized(request)), Input.Empty)
       }

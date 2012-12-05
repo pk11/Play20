@@ -13,6 +13,7 @@ import play.mvc.Http.{ Cookies => JCookies, Cookie => JCookie, Session => JSessi
  * Java compatible Results
  */
 object JavaResults extends Results with DefaultWriteables with DefaultContentTypeOfs {
+  import play.core.Execution._
   def writeContent(mimeType: String)(implicit codec: Codec): Writeable[Content] = Writeable(content => codec.encode(content.body), Some(ContentTypes.withCharset(mimeType)))
   def writeString(mimeType: String)(implicit codec: Codec): Writeable[String] = Writeable(s => codec.encode(s), Some(ContentTypes.withCharset(mimeType)))
   def writeString(implicit codec: Codec): Writeable[String] = writeString(MimeTypes.TEXT)
@@ -24,13 +25,14 @@ object JavaResults extends Results with DefaultWriteables with DefaultContentTyp
   def emptyHeaders = Map.empty[String, String]
   def empty = Results.EmptyContent()
   def async(p: scala.concurrent.Future[Result]) = AsyncResult(p)
-  def chunked[A](onDisconnected: () => Unit) = play.api.libs.iteratee.Enumerator.imperative[A](onComplete = onDisconnected)
-  def chunked(stream: java.io.InputStream, chunkSize: Int): Enumerator[Array[Byte]] = Enumerator.fromStream(stream, chunkSize)
-  def chunked(file: java.io.File, chunkSize: Int) = Enumerator.fromFile(file, chunkSize)
+  def chunked[A](onDisconnected: () => Unit) = play.api.libs.iteratee.Enumerator.imperative[A](onComplete = onDisconnected)(internalContext)
+  def chunked(stream: java.io.InputStream, chunkSize: Int): Enumerator[Array[Byte]] = Enumerator.fromStream(stream, chunkSize)(internalContext)
+  def chunked(file: java.io.File, chunkSize: Int) = Enumerator.fromFile(file, chunkSize)(internalContext)
 }
 import play.api.libs.concurrent._
 object JavaResultExtractor {
 
+  import play.core.Execution._
   def getStatus(result: play.mvc.Result): Int = result.getWrappedResult match {
     case r: AsyncResult => getStatus(new ResultWrapper(r.result.await.get))
     case PlainResult(status, _) => status
