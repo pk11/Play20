@@ -23,14 +23,14 @@ object JavascriptCompiler {
   def compile(source: File, simpleCompilerOptions: Seq[String], fullCompilerOptions: Option[CompilerOptions]): (String, Option[String], Seq[File]) = {
     import scala.util.control.Exception._
 
-    val simpleCheck = simpleCompilerOptions.contains("rjs")
+    val isRjsEnabled = simpleCompilerOptions.contains("rjs")
 
     val origin = Path(source).string
 
     val options = fullCompilerOptions.getOrElse {
       val defaultOptions = new CompilerOptions()
       defaultOptions.closurePass = true
-      if (!simpleCheck) {
+      if (!isRjsEnabled) {
         defaultOptions.setProcessCommonJSModules(true)
         defaultOptions.setCommonJSModulePathPrefix(source.getParent() + File.separator)
         defaultOptions.setManageClosureDependencies(Seq(toModuleName(source.getName())).asJava)
@@ -48,10 +48,10 @@ object JavascriptCompiler {
 
     val compiler = new Compiler()
     lazy val all = allSiblings(source)
-    val input = if (!simpleCheck) all.map(f => JSSourceFile.fromFile(f)).toArray else Array(JSSourceFile.fromFile(source))
+    val input = if (!isRjsEnabled) all.map(f => JSSourceFile.fromFile(f)).toArray else Array(JSSourceFile.fromFile(source))
 
     catching(classOf[Exception]).either(compiler.compile(Array[JSSourceFile](), input, options).success) match {
-      case Right(true) => (origin, { if (!simpleCheck) Some(compiler.toSource()) else None }, Nil)
+      case Right(true) => (origin, { if (!isRjsEnabled) Some(compiler.toSource()) else None }, {if (!isRjsEnabled) all else Seq(source)} )
       case Right(false) => {
         val error = compiler.getErrors().head
         val errorFile = all.find(f => f.getAbsolutePath() == error.sourceName)
